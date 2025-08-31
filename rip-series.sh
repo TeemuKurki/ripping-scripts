@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# mpv, ffmpeg, libdvdcss2
+# mpv, ffmpeg
 
 # Exit on error
 set -e
@@ -115,16 +115,18 @@ for ((i=0; i<NUM_EPISODES; i++)); do
     OUTPUT="${OUTPUT// /_}"
 
     echo "Ripping Title $DVD_TITLE → $OUTPUT"
-    tmpDir=$(mktemp -d)
-    echo "Created temporary directory" $tmpDir
+   
+    # Create temproraty FIFO queue for raw data
+    tempQueue=$(mktemp -u)
+    mkfifo $tempQueue
+    echo "Created temporary fifo queue" $tmpDir
 
-    #TODO: Look if it's possible to stream mpv stream directly to ffmpeg
+    mpv dvd://$DVD_TITLE --dvd-device=$DVD_PATH --stream-dump=$tempQueue &
+    ffmpeg -analyzeduration 10000000 -probesize 100M -i $tempQueue -map 0:v:0 -map 0:a -map 0:s -c:v h264_nvenc -preset p7 -rc vbr -cq 28 -c:a copy -c:s copy $OUTPUT
 
-    mpv dvd://$DVD_TITLE --dvd-device=$DVD_PATH --stream-dump=$tmpDir/dvdstream.vob
-    ffmpeg -analyzeduration 10000000 -i $tmpDir/dvdstream.vob -map 0:v:0 -map 0:a -map 0:s -c:v h264_nvenc -preset p7 -rc vbr -cq 28 -c:a copy -c:s copy $OUTPUT
-    rm $tmpDir/dvdstream.vob
-    rmdir $tmpDir
-    echo "Remove temp files and folders"
+    #Clean up
+    rm "${tempQueue}"
+    echo "Removed temporary files"
 done
 
 echo "✅ Finished ripping $NUM_EPISODES episodes from $DVD_PATH"

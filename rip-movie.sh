@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#Using: vlc, lsdvd, ffmpeg
+#Using: mpv, lsdvd, ffmpeg
 
 # Exit on error
 set -e
@@ -62,14 +62,21 @@ OUTPUT="${OUTPUT// /_}"
 
 # Rip Movie
 echo "Ripping Title $DVD_TITLE → $OUTPUT"
-tmpDir=$(mktemp -d -p ~)
-echo "Created temporary directory" $tmpDir
-mpv dvd://$DVD_TITLE --dvd-device=$DVD_PATH --stream-dump=$tmpDir/dvdstream.vob
+# Create temproraty FIFO queue for raw data
+tempQueue=$(mktemp -u)
+mkfifo $tempQueue
+echo "Created temporary fifo queue" $tmpDir
+
+# Push raw data to FIFO queue on the background
+mpv dvd://$DVD_TITLE --dvd-device=$DVD_PATH --stream-dump=$tempQueue &
+#Process FOFO queue data, compress and transcode raw data into .mkv file
 #Analyze for 5min to find all subtitles
-ffmpeg -analyzeduration 300000000 -probesize 100M -i $tmpDir/dvdstream.vob -map 0:v:0 -map 0:a -map 0:s -c:v h264_nvenc -preset p7 -rc vbr -cq 28 -c:a copy -c:s copy $OUTPUT
-rm $tmpDir/dvdstream.vob
-rmdir $tmpDir
-echo "Remove temp files and folders"
+ffmpeg -analyzeduration 300000000 -probesize 100M -i $tempQueue -map 0:v:0 -map 0:a -map 0:s -c:v h264_nvenc -preset p7 -rc vbr -cq 28 -c:a copy -c:s copy $OUTPUT
+#Running ripping and processing in parallel improves efficiency and reduces required storage space as ffmpeg immidiately process the data chuncks from mpv  
+
+#Clean up
+rm "${tempQueue}"
+echo "Removed temporary files"
 
 
 
