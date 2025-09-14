@@ -8,7 +8,7 @@ SHOW=""
 DISK_NUM=""
 TITLE_NUM=""
 KEY_PATH=""
-TRACK_MIN_LENGHT=40
+TRACK_MIN_LENGHT=20
 SEASON=1
 SUBTITLE_TRACK=1
 AUDIO_TRACK=1
@@ -72,8 +72,8 @@ for t in "${arr[@]}"; do
     IFS=: read -r h m s <<< $(awk '{print $4}' <<< $t)
     title=$(awk '{print $2}' <<< $t)
     chapters=$(awk '{print $6}' <<< $t)
-    # Only splice titles that are longer than 1 minute
-    if [[ -n "$m" && ( $h -gt 0 || $m -gt $TRACK_MIN_LENGHT ) ]]; then
+    # Only splice titles that are longer min lenght
+    if [[ -n "$m" && ( $h -gt 0 || $m -ge $TRACK_MIN_LENGHT ) ]]; then
       playlist=$(awk '{print $12}' <<< $t)
       order=$(echo $playlist | grep -o '[0-9]\+')
       echo $order
