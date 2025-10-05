@@ -10,7 +10,7 @@ create_map() {
     if [[ -n "$2"  ]]; then
         map_str="0:$2:$1"
     else
-        map_str="0:$2"
+        map_str="0:$1"
     fi
     echo "$map_str"
 }
@@ -25,6 +25,7 @@ TRACK_MIN_LENGHT=20
 SEASON=1
 SUBTITLE_TRACK=""
 AUDIO_TRACK=""
+MIN_OUTPUT_SIZE_MB=1
 
 # --- Parse named arguments ---
 for arg in "$@"; do
@@ -87,6 +88,8 @@ for t in "${arr[@]}"; do
 
         OUTPUT="${SEASON_PATH}/${FILE_NAME}"
         OUTPUT="$DIR_PATH/$SHOW-D$DISC_NUM-T$title.mkv"
+        OUTPUT=${OUTPUT// /_}
+
 
         # Create temproraty FIFO queue for raw data
         tempQueue=$(mktemp -u)
@@ -104,6 +107,17 @@ for t in "${arr[@]}"; do
         if [[ $? -ne 0 ]]; then
             echo "FFmpeg threw error on Title: $title"
         fi
+
+        # Could use ffprobe to check movie duration to remove duplicate multiple episodes in single mkv file
+        if [[ -e $OUTPUT ]]; then
+            outputSize=$(stat $OUTPUT -c %s)
+            if [[  $outputSize -lt $(($MIN_OUTPUT_SIZE_MB * 1000000)) ]]; then
+                # Remove ouput file if its less than $MIN_OUTPUT_SIZE_MB to clear menu files etc.
+                echo "Removing: $OUTPUT"
+                rm $OUTPUT  
+            fi
+        fi
+
         set -e   # re-enable exit-on-error
 
         #Clean up
