@@ -12,6 +12,7 @@ TRACK_MIN_LENGHT=20
 SEASON=1
 SUBTITLE_TRACK=1
 AUDIO_TRACK=1
+AUDIO_CODEC=copy
 
 # --- Parse named arguments ---
 for arg in "$@"; do
@@ -42,6 +43,9 @@ for arg in "$@"; do
             ;;
         --audio-track=*)
             AUDIO_TRACK="${arg#*=}"
+            ;;
+        --audio-codec=*)
+            AUDIO_CODEC="${arg#*=}"
             ;;
         *)
             echo "Unknown argument: $arg"
@@ -79,7 +83,7 @@ for t in "${arr[@]}"; do
       echo $order
       #Rip streams
       # Splice all chapters together in found title stream output to ffmpeg for compression and transcoding it to .mkv file
-      bd_splice -t $title -c 1-$chapters -k $KEY_PATH $DVD_PATH  | ffmpeg -i - -map 0:v:0 -map 0:a:1 -map 0:s:1 -c:v h264_nvenc -preset p7 -rc vbr -cq 25 -c:a copy -c:s copy $DIR_PATH/$SHOW-D$DISC_NUM-P$order-T$title.mkv
+      bd_splice -t $title -c 1-$chapters -k $KEY_PATH $DVD_PATH  | ffmpeg  -i - -map 0:v:0 -map 0:a -map 0:s -c:v h264_nvenc -preset p7 -rc vbr -cq 25 -c:a $AUDIO_CODEC -c:s copy $DIR_PATH/$SHOW-D$DISC_NUM-P$order-T$title.mkv
     fi
 done
 
