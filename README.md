@@ -16,9 +16,13 @@ Data is extracted from disk as is, meaning there is no compressing or transcodin
 
 **Dependencies**
 
-- bd_list_titles
-- bd_splice
+- libbluray-bin
+  - bd_list_titles
+  - bd_splice
+- libaacs0
+- libbluray-bdj
 - ffmpeg
+- mpv
 
 Utilizes `bd_list_titles` to get list of titles and number of chapters for each title. List is filtered by the length of the title to remove unnecessary videos, such as trailers. For each found title, info is passed to `bd_splice` to combine all chapter together to produce complete movie/episode. Data from `bd_splice` is streamed directly into `ffmpeg` to create compressed .mkv file.
 

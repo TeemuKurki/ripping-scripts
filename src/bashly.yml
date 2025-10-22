@@ -1,0 +1,117 @@
+name: ripper
+help: Rip DVDs and Blurays
+version: 0.1.0
+
+commands:
+  - name: dvd
+    args:
+      - name: title
+        required: true
+        help: Title of the Bluray
+    flags:
+      - long: --show
+      - long: --disk-path
+        arg: disk-path
+        help: Disk drive location
+        default: /dev/sr0
+      - long: --min-length
+        arg: min-length
+        help: |
+          Minimum length of title for rippping
+        default: "20"
+      - long: --season
+        arg: season
+        default: "1"
+        needs:
+          - --show
+      - long: --disk
+        arg: disk
+        default: "1"
+      - long: --audio-track
+        arg: audio-track
+      - long: --subtitle-track
+        arg: subtitle-track
+      - long: --audio-codec
+        arg: audio-codec
+        default: copy
+        help: Used ffmpeg audio codec. By default copy from source
+      - long: --verify-speed
+        arg: verify-speed
+        default: "16"
+        help: Set verify speed multiplier. Set to 0 to disable
+      - long: --exit-on-verify-error
+        arg: exit-on-verify-error
+        default: "false"
+        help: Exit if verification fails
+        allowed:
+          - "false"
+          - "true"
+      - long: --min-output-size
+        arg: min-output-size
+        default: "1"
+        help: Delete output files smaller than value in MB
+    dependencies:
+      bd_utils:
+        command:
+          - lsdvd
+        help: Run 'sudo apt install lsdvd'
+      ffmpeg:
+        command:
+          - ffmpeg
+        help: Run 'sudo apt install ffmpeg'
+      mpv: Run 'sudo apt install mpv'
+
+  - name: bluray
+    args:
+      - name: title
+        required: true
+        help: Title of the Bluray
+    flags:
+      - long: --show
+      - long: --disk-path
+        arg: disk-path
+        help: Disk drive location
+        default: /dev/sr0
+      - long: --key
+        arg: key
+        default: $HOME/.config/aacs/KEYDB.cfg
+        help: Location of aacs KEYDB.cfg
+      - long: --min-length
+        arg: min-length
+        help: |
+          Minimum length of title for rippping
+        default: "20"
+      - long: --season
+        arg: season
+        default: "1"
+        needs:
+          - --show
+      - long: --disk
+        arg: disk
+        default: "1"
+      - long: --audio-codec
+        arg: audio-codec
+        default: copy
+        help: Used ffmpeg audio codec. By default copy from source
+      - long: --verify-speed
+        arg: verify-speed
+        default: "16"
+        help: Set verify speed multiplier. Set to 0 to disable
+      - long: --exit-on-verify-error
+        arg: exit-on-verify-error
+        default: "false"
+        help: Exit if verification fails
+        allowed:
+          - "false"
+          - "true"
+    dependencies:
+      bd_utils:
+        command:
+          - bd_list_titles
+          - bd_splice
+        help: Run 'sudo apt install libbluray-bin'
+      ffmpeg:
+        command:
+          - ffmpeg
+        help: Run 'sudo apt install ffmpeg'
+      mpv: Run 'sudo apt install mpv'
