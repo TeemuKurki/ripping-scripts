@@ -26,7 +26,7 @@ output_path(){
 rip_video(){
     local DVD_TITLE=$1 
 
-    OUTPUT="$DIR_PATH/$SHOW-D$DISC_NUM-T$title.mkv"
+    OUTPUT="$DIR_PATH/$SHOW-D$DISK_NUM-T$title.mkv"
     OUTPUT=${OUTPUT// /_}
 
 
