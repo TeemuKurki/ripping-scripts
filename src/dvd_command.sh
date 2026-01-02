@@ -25,40 +25,51 @@ output_path(){
 
 stream_metadatas(){
     local DVD_TITLE=$1
-    metadata_dump=$(mpv dvd://$DVD_TITLE --dvd-device=$DVD_PATH --vo=null --ao=null --frames=0 --msg-level=all=info)
-    #echo $metadata_dump
-    mapfile -t subs_array < <(echo "$metadata_dump" | grep "Subs")
-    mapfile -t audios_array < <(echo "$metadata_dump" | grep "Audio")
-
     metadata_array=()
+    # If --no-auto-meta set, skip metadata parse
+    if [[ -z "$NO_AUTO_META" ]]; then
+        metadata_dump=$(mpv dvd://$DVD_TITLE --dvd-device=$DVD_PATH --vo=null --ao=null --frames=0 --msg-level=all=info)
+        #echo $metadata_dump
+        mapfile -t subs_array < <(echo "$metadata_dump" | grep "Subs")
+        mapfile -t audios_array < <(echo "$metadata_dump" | grep "Audio")
 
-    #TODO: Find language based on text input. (en,fi)
 
-    for i in "${!audios_array[@]}"; do
-        line="${audios_array[$i]}"
-        lang=$(echo "$line" | grep -oP '(?<=--alang=)[^ ]+')
-        if [[ -z "$AUDIO_TRACK" || "$AUDIO_TRACK" -eq "$i" ]]; then
-            metadata_array+=("-metadata:s:a:$i language=$lang")
-        fi
-    done
+        #TODO: Find language based on text input. (en,fi)
+        for i in "${!audios_array[@]}"; do
+            line="${audios_array[$i]}"
+            lang=$(echo "$line" | grep -oP '(?<=--alang=)[^ ]+')
+            if [[ -z "$AUDIO_TRACK" || "$AUDIO_TRACK" -eq "$i" ]]; then
+                metadata_array+=("-metadata:s:a:$i language=$lang")
+                #TODO: Set flag-default=1 if using $AUDIO_TRACK
+            fi
+        done
 
-    for i in "${!subs_array[@]}"; do
-        if [[ -z "$SUBTITLE_TRACK" || "$SUBTITLE_TRACK" -eq "$i" ]]; then
-            line="${subs_array[$i]}"
-            lang=$(echo "$line" | grep -oP '(?<=--slang=)[^ ]+')
-            metadata_array+=("-metadata:s:s:$i language=$lang")
-        fi
-    done
-
+        for j in "${!subs_array[@]}"; do
+            if [[ -z "$SUBTITLE_TRACK" || "$SUBTITLE_TRACK" -eq "$j" ]]; then
+                line="${subs_array[$j]}"
+                lang=$(echo "$line" | grep -oP '(?<=--slang=)[^ ]+')
+                metadata_array+=("-metadata:s:s:$j language=$lang")
+                #TODO: Set flag-default=1 if using $SUBTITLE_TRACK
+            fi
+        done
+    fi
     printf "%s\n" "${metadata_array[@]}"
 }
 
 rip_video(){
     local DVD_TITLE=$1 
 
-    OUTPUT="$DIR_PATH/$SHOW-D$DISK_NUM-T$title.mkv"
+    OUTPUT="$DIR_PATH/$SHOW-D$DISK_NUM-T$DVD_TITLE.mkv"
     OUTPUT=${OUTPUT// /_}
 
+    set +e
+    prompt_existing_file_deletion "$OUTPUT"
+    resp=$?
+    set -e
+    if [[ $resp -eq 2 ]]; then
+        # Exit early if output file already exists and did not delete
+        return 0
+    fi
 
     # Create temproraty FIFO queue for raw data
      # Create temp directory
@@ -76,8 +87,8 @@ rip_video(){
         [[ -d "$tempdir" ]] && rmdir "$tempdir" 2>/dev/null
     }
 
-    # Always run cleanup when function exits (success or failure)
-    trap cleanup RETURN
+    # Always run cleanup when function exits (success, failure, ctrl+c, kill)
+    trap cleanup EXIT SIGINT SIGTERM
 
     mkfifo $tempQueue
     echo "Created temporary fifo queue" $tempQueue
@@ -116,7 +127,7 @@ rip_video(){
         outputSize=$(stat $OUTPUT -c %s)
         if [[  $outputSize -lt $(($MIN_OUTPUT_SIZE_MB * 1000000)) ]]; then
             # Remove ouput file if its less than $MIN_OUTPUT_SIZE_MB to clear menu files etc.
-            echo "Removing: $OUTPUT"
+            echo "Ripped file size less than $MIN_OUTPUT_SIZE_MB MB. Removing: $OUTPUT"
             rm $OUTPUT  
         fi
     fi
@@ -127,6 +138,7 @@ DVD_PATH="${args[--disk-path]}"
 IS_SHOW="${args[--show]}"
 SHOW="${args[title]}"
 TRACK_MIN_LENGHT="${args[--min-length]}"
+TRACK_MAX_LENGHT="${args[--max-length]}"
 SEASON="${args[--season]}"
 DISK_NUM="${args[--disk]}"
 AUDIO_CODEC="${args[--audio-codec]}"
@@ -135,7 +147,8 @@ EXIT_ON_VERIFY_ERR="${args[--exit-on-verify-error]}"
 AUDIO_TRACK="${args[--audio-track]}"
 SUBTITLE_TRACK="${args[--subtitle-track]}"
 MIN_OUTPUT_SIZE_MB="${args[--min-output-size]}"
-
+NO_AUTO_META="${args[--no-auto-meta]}"
+eval "TITLES=(${args[--title]:-})"
 
 # Get episode streams indexes and num of chapters
 
@@ -146,23 +159,31 @@ DIR_PATH=$(output_path)
 DIR_PATH=${DIR_PATH// /_}
 
 mkdir -p "${DIR_PATH}"
-if [[ -n $IS_SHOW ]]; then
+
+if [[ -n $TITLES ]]; then
+    for t in "${TITLES[@]}"; do
+        DVD_TITLE=$((10#$t))
+        rip_video $DVD_TITLE
+    done
+
+elif [[ -n $IS_SHOW ]]; then
     # --- Loop over episodes ---
     for t in "${arr[@]}"; do
         IFS=: read -r h m s <<< $(awk '{print $4}' <<< $t)
+
+        track_length_in_min=$((${h:-"0"} * 60 + ${m:-"0"}))
+
         title=$(awk '{print $2}' <<< $t)
         title="${title%,}" # Remove trailing comma
         chapters=$(awk '{print $6}' <<< $t)
         chapters="${chapters%,}" # Remove trailing comma
-
-
 
         if [[ -n "$m" ]]; then
             # Force base-10 encoding
             m=$((10#$m))
         fi
 
-        if [[ -n "$m" && ( $h -gt 0 || $m -ge $TRACK_MIN_LENGHT ) ]]; then
+        if [[ $track_length_in_min -ge $TRACK_MIN_LENGHT && ($TRACK_MAX_LENGHT -eq 0 || $track_length_in_min -le $TRACK_MAX_LENGHT)  ]]; then
             # Transform title to base-10. Remove leading zeros 
             DVD_TITLE=$((10#$title))
             rip_video $DVD_TITLE

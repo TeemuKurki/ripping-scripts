@@ -19,6 +19,11 @@ commands:
         help: |
           Minimum length of title for rippping
         default: "20"
+      - long: --max-length
+        arg: max-length
+        default: "0"
+        help: |
+          Maximum length of title for rippping. Set to '0' to disable
       - long: --season
         arg: season
         default: "1"
@@ -27,6 +32,13 @@ commands:
       - long: --disk
         arg: disk
         default: "1"
+      - long: --title
+        short: -t
+        arg: titles
+        repeatable: true
+        unique: true
+        help: |
+          Set specific titles to be ripped. Setting this will ignore --min-length and --max-length properties
       - long: --audio-track
         arg: audio-track
       - long: --subtitle-track
@@ -48,8 +60,10 @@ commands:
           - "true"
       - long: --min-output-size
         arg: min-output-size
-        default: "1"
+        default: "10"
         help: Delete output files smaller than value in MB
+      - long: --no-auto-meta
+        help: Do not set language metadata for audio and subtitle streams
     dependencies:
       bd_utils:
         command:
