@@ -61,7 +61,24 @@ rip_video(){
 
 
     # Create temproraty FIFO queue for raw data
-    tempQueue=$(mktemp -u)
+     # Create temp directory
+    tempdir="$(mktemp -d)"
+    tempQueue="$tempdir/stream.fifo"
+
+    cleanup() {
+        # Kill background mpv if still running
+        if [[ -n "$mpv_pid" ]] && kill -0 "$mpv_pid" 2>/dev/null; then
+            kill "$mpv_pid" 2>/dev/null
+        fi
+
+        # Remove FIFO and temp dir
+        [[ -p "$tempQueue" ]] && rm -f "$tempQueue"
+        [[ -d "$tempdir" ]] && rmdir "$tempdir" 2>/dev/null
+    }
+
+    # Always run cleanup when function exits (success or failure)
+    trap cleanup RETURN
+
     mkfifo $tempQueue
     echo "Created temporary fifo queue" $tempQueue
 
@@ -74,6 +91,7 @@ rip_video(){
     metadatas=$(stream_metadatas $DVD_TITLE)
     #echo $metadatas
     mpv dvd://$DVD_TITLE --dvd-device=$DVD_PATH --stream-dump=$tempQueue &
+    mpv_pid=$!
     # analyzeduration == 5 minutes to find subtitles
     ffmpeg -analyzeduration 300000000 -probesize 500M -i $tempQueue -map 0:v -map $AUDIO_MAP -map $SUB_MAP -c:v h264_nvenc -preset p7 -rc vbr -cq 28 -c:a aac -b:a 192k -c:s copy $metadatas $OUTPUT
     if [[ $? -ne 0 ]]; then
@@ -102,7 +120,6 @@ rip_video(){
             rm $OUTPUT  
         fi
     fi
-
 }
 
 # Default values
