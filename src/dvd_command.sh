@@ -23,6 +23,36 @@ output_path(){
     fi
 }
 
+stream_metadatas(){
+    local DVD_TITLE=$1
+    metadata_dump=$(mpv dvd://$DVD_TITLE --dvd-device=$DVD_PATH --vo=null --ao=null --frames=0 --msg-level=all=info)
+    #echo $metadata_dump
+    mapfile -t subs_array < <(echo "$metadata_dump" | grep "Subs")
+    mapfile -t audios_array < <(echo "$metadata_dump" | grep "Audio")
+
+    metadata_array=()
+
+    #TODO: Find language based on text input. (en,fi)
+
+    for i in "${!audios_array[@]}"; do
+        line="${audios_array[$i]}"
+        lang=$(echo "$line" | grep -oP '(?<=--alang=)[^ ]+')
+        if [[ -z "$AUDIO_TRACK" || "$AUDIO_TRACK" -eq "$i" ]]; then
+            metadata_array+=("-metadata:s:a:$i language=$lang")
+        fi
+    done
+
+    for i in "${!subs_array[@]}"; do
+        if [[ -z "$SUBTITLE_TRACK" || "$SUBTITLE_TRACK" -eq "$i" ]]; then
+            line="${subs_array[$i]}"
+            lang=$(echo "$line" | grep -oP '(?<=--slang=)[^ ]+')
+            metadata_array+=("-metadata:s:s:$i language=$lang")
+        fi
+    done
+
+    printf "%s\n" "${metadata_array[@]}"
+}
+
 rip_video(){
     local DVD_TITLE=$1 
 
@@ -41,9 +71,11 @@ rip_video(){
     echo "Ripping Title $DVD_TITLE → $OUTPUT"
 
     set +e   # disable exit-on-error
+    metadatas=$(stream_metadatas $DVD_TITLE)
+    #echo $metadatas
     mpv dvd://$DVD_TITLE --dvd-device=$DVD_PATH --stream-dump=$tempQueue &
     # analyzeduration == 5 minutes to find subtitles
-    ffmpeg -analyzeduration 300000000 -probesize 500M -i $tempQueue -map 0:v -map $AUDIO_MAP -map $SUB_MAP -c:v h264_nvenc -preset p7 -rc vbr -cq 28 -c:a copy -c:s copy $OUTPUT
+    ffmpeg -analyzeduration 300000000 -probesize 500M -i $tempQueue -map 0:v -map $AUDIO_MAP -map $SUB_MAP -c:v h264_nvenc -preset p7 -rc vbr -cq 28 -c:a aac -b:a 192k -c:s copy $metadatas $OUTPUT
     if [[ $? -ne 0 ]]; then
         echo "FFmpeg threw error on Title: $title"
     fi
@@ -122,4 +154,4 @@ if [[ -n $IS_SHOW ]]; then
 else
     rip_video
 fi
-echo "✅ Finished ripping $NUM_EPISODES episodes from $DVD_PATH"
+echo "Finished ripping $NUM_EPISODES episodes from $DVD_PATH"

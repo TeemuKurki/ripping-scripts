@@ -19,6 +19,36 @@ chaper_range(){
     fi
 }
 
+stream_metadatas(){
+    local BD_TITLE=$1 
+    metadata_dump=$(mpv bluray://$BD_TITLE --bluray-device=$DVD_PATH  --vo=null --ao=null --frames=0 --msg-level=all=info)
+    #echo $metadata_dump
+    mapfile -t subs_array < <(echo "$metadata_dump" | grep "Subs")
+    mapfile -t audios_array < <(echo "$metadata_dump" | grep "Audio")
+
+    metadata_array=()
+
+    #TODO: Find language based on text input. (en,fi
+
+    for i in "${!audios_array[@]}"; do
+        line="${audios_array[$i]}"
+        lang=$(echo "$line" | grep -oP '(?<=--alang=)[^ ]+')
+        if [[ -z "$AUDIO_TRACK" || "$AUDIO_TRACK" -eq "$i" ]]; then
+            metadata_array+=("-metadata:s:a:$i language=$lang")
+        fi
+    done
+
+    for i in "${!subs_array[@]}"; do
+        if [[ -z "$SUBTITLE_TRACK" || "$SUBTITLE_TRACK" -eq "$i" ]]; then
+            line="${subs_array[$i]}"
+            lang=$(echo "$line" | grep -oP '(?<=--slang=)[^ ]+')
+            metadata_array+=("-metadata:s:s:$i language=$lang")
+        fi
+    done
+
+    printf "%s " "${metadata_array[@]}"
+}
+
 # Default values
 DVD_PATH="${args[--disk-path]}"
 IS_SHOW="${args[--show]}"
@@ -62,8 +92,10 @@ for t in "${arr[@]}"; do
       order=$(echo $playlist | grep -o '[0-9]\+')
       target=$DIR_PATH/$SHOW-D$DISC_NUM-P$order-T$title.mkv
       
+      metadatas=$(stream_metadatas $title)
+      #echo $metadatas
       # Splice all chapters together in found title stream output to ffmpeg for compression and transcoding it to .mkv file
-      bd_splice -t $title -c $(chaper_range $chapters) -k $key_path $DVD_PATH  | ffmpeg  -i - -map 0:v:0 -map 0:a -map 0:s -c:v h264_nvenc -preset p7 -rc vbr -cq 25 -c:a $AUDIO_CODEC -c:s copy $target
+      bd_splice -t $title -c $(chaper_range $chapters) -k $key_path $DVD_PATH  | ffmpeg  -i - -map 0:v:0 -map 0:a -map 0:s -c:v h264_nvenc -preset p7 -rc vbr -cq 25 -c:a $AUDIO_CODEC -c:s copy $metadatas $target
     fi
 
 

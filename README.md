@@ -1,5 +1,7 @@
 # Bash scripts for ripping Blurays and DVDs
 
+Script is generated using [Bashly](https://bashly.dev)
+
 ## Overview
 
 Scripts for automatically rip DVD and Bluray movies and shows. Scripts for DVD and Bluray are conceptually same, just using different libraries for extracting the data from the disk.
@@ -10,7 +12,7 @@ Scripts work in three parts:
 - Extract title data
 - Transcode and compress data
 
-Data is extracted from disk as is, meaning there is no compressing or transcoding done in data extraction phase. Extracted data is streamed from extraction phase into ffmpeg and comppression and transcoding etc. is done there giving us much more fine-grained control over end result. This was also only reliable way I could find to include subtitles without burning those to video stream directly
+Data is extracted from disk as is, meaning there is no compressing or transcoding done in data extraction phase. Extracted data is streamed from extraction phase into ffmpeg for compression and transcoding etc. Using ffmpeg for transcoding and comperrison gives us much more fine-grained control over end result. This was also only reliable way I could find to include subtitles without burning those to video stream directly.
 
 ### Bluray
 
@@ -37,3 +39,9 @@ Output file contains the name of the playlist extracted with `bd_list_titles`. T
 - ffmpeg
 
 Utilizes `lsdvd` to get list of titles and number of chapters for each title. List is filtered by the length of the title to remove unnecessary videos, such as trailers. For each found title, info is passed to `mpv` to produce complete movie/episode. As `mpv` requires output file we create temporary fifo queue for the output and run `ffmpeg` in parallel using temp fifo queue as an input.
+
+### Utils
+
+- mkvtoolnix
+
+Utilizes `mkvpropedit` from `mkvtoolnix` for updating mkv files metatags.

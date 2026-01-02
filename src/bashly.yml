@@ -33,8 +33,8 @@ commands:
         arg: subtitle-track
       - long: --audio-codec
         arg: audio-codec
-        default: copy
-        help: Used ffmpeg audio codec. By default copy from source
+        default: aac
+        help: Used ffmpeg audio codec. By default use aac
       - long: --verify-speed
         arg: verify-speed
         default: "16"
@@ -91,8 +91,8 @@ commands:
         default: "1"
       - long: --audio-codec
         arg: audio-codec
-        default: copy
-        help: Used ffmpeg audio codec. By default copy from source
+        default: aac
+        help: Used ffmpeg audio codec. By default use aac
       - long: --verify-speed
         arg: verify-speed
         default: "16"
@@ -115,3 +115,30 @@ commands:
           - ffmpeg
         help: Run 'sudo apt install ffmpeg'
       mpv: Run 'sudo apt install mpv'
+
+  - name: update_track_meta
+    help: Set metadata information for tracks. Eg Audio track language
+    args:
+      - name: target
+        required: true
+        help: Target file or directory. If provided directory will update all files in directory
+        validate: dir_or_file_exists
+      - name: track
+        required: true
+        help: |
+          Track number (1) or one of the chars 'a', 'b', 's' or 'v' followed by a number 'n' selects the nth audio, button, subtitle or video track (s1)
+    flags:
+      - long: --set
+        short: -s
+        arg: meta
+        required: true
+        repeatable: true
+        unique: true
+    examples:
+      - ripper update_track_meta ~/Videos/<show>/<season> a1 -s language=eng -s name=English
+      - ripper update_track_meta ~/Videos/movie-name.mkv s1 -s language=fin -s name=Finnish -s flag-default=1
+    dependencies:
+      mkvtoolnix:
+        command:
+          - mkvpropedit
+        help: Run 'sudo apt install mkvtoolnix'
