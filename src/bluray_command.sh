@@ -19,36 +19,6 @@ chaper_range(){
     fi
 }
 
-stream_metadatas(){
-    local BD_TITLE=$1 
-    metadata_dump=$(mpv bluray://$BD_TITLE --bluray-device=$DVD_PATH  --vo=null --ao=null --frames=0 --msg-level=all=info)
-    #echo $metadata_dump
-    mapfile -t subs_array < <(echo "$metadata_dump" | grep "Subs")
-    mapfile -t audios_array < <(echo "$metadata_dump" | grep "Audio")
-
-    metadata_array=()
-
-    #TODO: Find language based on text input. (en,fi
-
-    for i in "${!audios_array[@]}"; do
-        line="${audios_array[$i]}"
-        lang=$(echo "$line" | grep -oP '(?<=--alang=)[^ ]+')
-        if [[ -z "$AUDIO_TRACK" || "$AUDIO_TRACK" -eq "$i" ]]; then
-            metadata_array+=("-metadata:s:a:$i language=$lang")
-        fi
-    done
-
-    for i in "${!subs_array[@]}"; do
-        if [[ -z "$SUBTITLE_TRACK" || "$SUBTITLE_TRACK" -eq "$i" ]]; then
-            line="${subs_array[$i]}"
-            lang=$(echo "$line" | grep -oP '(?<=--slang=)[^ ]+')
-            metadata_array+=("-metadata:s:s:$i language=$lang")
-        fi
-    done
-
-    printf "%s " "${metadata_array[@]}"
-}
-
 # Default values
 DVD_PATH="${args[--disk-path]}"
 IS_SHOW="${args[--show]}"
@@ -60,6 +30,11 @@ DISK_NUM="${args[--disk]}"
 AUDIO_CODEC="${args[--audio-codec]}"
 VERIFY_SPEED="${args[--verify-speed]}"
 EXIT_ON_VERIFY_ERR="${args[--exit-on-verify-error]}"
+
+AUDIO_TRACK="${args[--audio-track]}"
+SUBTITLE_TRACK="${args[--subtitle-track]}"
+VIDEO_TRACK="${args[--video-track]}"
+VIDEO_ENCODING_PARAMS="${args[--video-encoding-params]}"
 
 # Get episode streams indexes and num of chapters
 mapfile -t arr < <(bd_list_titles $DVD_PATH) 
@@ -76,38 +51,45 @@ key_path=$(readlink -m $KEY_PATH)
 # Extract all episodes
 for t in "${arr[@]}"; do
     IFS=: read -r h m s <<< $(awk '{print $4}' <<< $t)
+    minutes=$(string_to_number $m)
+    hours=$(string_to_number $h)
 
-    if [[ -n "$m" ]]; then
-        # Force base-10 encoding
-        m=$((10#$m))
-    fi
+    track_length_in_min=$(($hours * 60 + $minutes))
 
     title=$(awk '{print $2}' <<< $t)
     chapters=$(awk '{print $6}' <<< $t)
-    # Only splice titles that are longer min lenght
     
+    AUDIO_MAP=$(create_ffmpeg_map $AUDIO_TRACK "a")
+    SUB_MAP=$(create_ffmpeg_map $SUBTITLE_TRACK "s")
+    VIDEO_MAP=$(create_ffmpeg_map $VIDEO_TRACK "v")
 
-    if [[ -n "$m" && ( $h -gt 0 || $m -ge $TRACK_MIN_LENGHT ) ]]; then
+    # Only splice titles that are longer min lenght
+    if [[ $track_length_in_min -ge $TRACK_MIN_LENGHT ]]; then
       playlist=$(awk '{print $12}' <<< $t)
       order=$(echo $playlist | grep -o '[0-9]\+')
-      target=$DIR_PATH/$SHOW-D$DISC_NUM-P$order-T$title.mkv
+      target=$DIR_PATH/$SHOW-D$DISK_NUM-P$order-T$title.mkv
       
-      metadatas=$(stream_metadatas $title)
-      #echo $metadatas
-      # Splice all chapters together in found title stream output to ffmpeg for compression and transcoding it to .mkv file
-      bd_splice -t $title -c $(chaper_range $chapters) -k $key_path $DVD_PATH  | ffmpeg  -i - -map 0:v:0 -map 0:a -map 0:s -c:v h264_nvenc -preset p7 -rc vbr -cq 25 -c:a $AUDIO_CODEC -c:s copy $metadatas $target
-    fi
+      set +e
+      prompt_existing_file_deletion "$target"
+      resp=$?
+      set -e
+      # Only rip if prompt answer is 1 (no conflict or conflict deleted)
+      if [[ $resp -eq 1 ]]; then
+        metadatas=$(get_stream_metadatas "bluray" $title)
+        # Splice all chapters together in found title stream output to ffmpeg for compression and transcoding it to .mkv file
+        bd_splice -t $title -c $(chaper_range $chapters) -k $key_path $DVD_PATH  | ffmpeg -i - $VIDEO_MAP $AUDIO_MAP $SUB_MAP $VIDEO_ENCODING_PARAMS -c:a $AUDIO_CODEC -c:s copy $metadatas $target
 
-
-    if [[ -s "$target" && $VERIFY_SPEED -gt 0 ]]; then
-        echo "Verifying: $target" 
-        mpv --speed=$VERIFY_SPEED --vo=null --stream-lavf-o=abort_on_error=yes $target
-        if [[ $? -ne 0 ]]; then
+        if [[ -s "$target" && $VERIFY_SPEED -gt 0 ]]; then
+          echo "Verifying: $target" 
+          mpv --speed=$VERIFY_SPEED --vo=null --stream-lavf-o=abort_on_error=yes $target
+          if [[ $? -ne 0 ]]; then
             echo "Verification failed for $target"
-            if [[ $EXIT_ON_VERIFY_ERR -eq "true" ]]; then
-                echo "Exiting on verification error"
-                exit 1;
+            if [[ -n "$EXIT_ON_VERIFY_ERR" ]]; then
+              echo "Exiting on verification error"
+              exit 1;
             fi
+          fi
         fi
+      fi
     fi
 done

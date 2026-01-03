@@ -43,6 +43,8 @@ commands:
         arg: audio-track
       - long: --subtitle-track
         arg: subtitle-track
+      - long: --video-track
+        arg: video-track
       - long: --audio-codec
         arg: audio-codec
         default: aac
@@ -52,18 +54,18 @@ commands:
         default: "16"
         help: Set verify speed multiplier. Set to 0 to disable
       - long: --exit-on-verify-error
-        arg: exit-on-verify-error
-        default: "false"
         help: Exit if verification fails
-        allowed:
-          - "false"
-          - "true"
       - long: --min-output-size
         arg: min-output-size
         default: "10"
         help: Delete output files smaller than value in MB
       - long: --no-auto-meta
         help: Do not set language metadata for audio and subtitle streams
+      - long: --video-encoding-params
+        arg: video-encoding-params
+        default: "-c:v h264_nvenc -preset p7 -rc vbr -cq 28"
+        help: |
+          Set video encoding parameters for ffmpeg
     dependencies:
       bd_utils:
         command:
@@ -112,12 +114,19 @@ commands:
         default: "16"
         help: Set verify speed multiplier. Set to 0 to disable
       - long: --exit-on-verify-error
-        arg: exit-on-verify-error
-        default: "false"
         help: Exit if verification fails
-        allowed:
-          - "false"
-          - "true"
+      - long: --audio-track
+        arg: audio-track
+      - long: --subtitle-track
+        arg: subtitle-track
+      - long: --video-track
+        arg: video-track
+      - long: --video-encoding-params
+        arg: video-encoding-params
+        default: "-c:v h264_nvenc -preset p7 -rc vbr -cq 23"
+        help: |
+          Set video encoding parameters for ffmpeg
+
     dependencies:
       bd_utils:
         command:
